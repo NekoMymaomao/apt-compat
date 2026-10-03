@@ -1,0 +1,85 @@
+# build.yml — 云端编译工作流 / Cloud build workflow
+#
+# 作用：让任何人在 GitHub 上点击即可编译出静态二进制，无需本地环境。
+# What it does: lets anyone build the static binaries on GitHub with one click,
+# no local toolchain required.
+#
+# 产物 / Artifacts:
+#   - apt-<arch>-musl    (musl 静态链接，最干净 / musl static, cleanest)
+#   - apt-<arch>-glibc   (glibc 静态链接 / glibc static)
+# 打 tag（形如 v1.0.0）会额外创建 Release 并附带这些二进制。
+# Pushing a tag (e.g. v1.0.0) additionally creates a Release with these binaries.
+
+name: build
+
+on:
+  push:
+    branches: [ master, main ]
+    tags: [ 'v*' ]
+  pull_request:
+  workflow_dispatch:        # 允许在 Actions 页面手动触发 / allow manual runs
+
+jobs:
+  build:
+    name: build ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x86_64
+          - os: ubuntu-24.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.os }}
+    env:
+      ARCH: ${{ matrix.arch }}
+    steps:
+      - name: Checkout / 检出代码
+        uses: actions/checkout@v4
+
+      - name: Install musl toolchain / 安装 musl 工具链
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+
+      - name: Build (musl static) / 构建（musl 静态）
+        run: musl-gcc -O2 -static -s -o "apt-${ARCH}-musl" apt-compat.c apt-backends.c
+
+      - name: Build (glibc static) / 构建（glibc 静态）
+        run: gcc -O2 -static -s -o "apt-${ARCH}-glibc" apt-compat.c apt-backends.c
+
+      - name: Verify static / 校验静态链接
+        run: |
+          for f in "apt-${ARCH}-musl" "apt-${ARCH}-glibc"; do
+            echo "== $f =="
+            file "$f"
+            ldd "$f" 2>&1 || true          # 期望 "not a dynamic executable"
+            ./"$f" --version || true
+          done
+
+      - name: Upload artifacts / 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: apt-${{ matrix.arch }}
+          path: apt-${{ matrix.arch }}-*
+          if-no-files-found: error
+
+  release:
+    name: release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')     # 仅打 tag 时运行 / only on tags
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts / 下载全部产物
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create Release / 创建 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

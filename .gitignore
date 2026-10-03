@@ -1,0 +1,9 @@
+# build output
+/apt
+*.o
+
+# third-party reference clones / local-only files
+/reference/
+/.aicode/
+/default.zip
+/fetch_wallpapers.py
