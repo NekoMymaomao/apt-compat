@@ -67,7 +67,8 @@ jobs:
   release:
     name: release
     needs: build
-    if: startsWith(github.ref, 'refs/tags/')     # 仅打 tag 时运行 / only on tags
+    # 打 tag 或推送到主分支时都发布 / publish on tags and on pushes to the main branch
+    if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -78,8 +79,26 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Create Release / 创建 Release
+      # 打 tag：发布以 tag 命名的正式 Release
+      # tag push: publish a proper Release named after the tag
+      - name: Publish release for tag / 发布 tag 正式版
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
           generate_release_notes: true
+
+      # 主分支推送：滚动更新一个 latest 预发布，始终附带最新二进制
+      # branch push: rolling "latest" pre-release with the newest binaries
+      - name: Publish rolling latest / 发布滚动 latest
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest (rolling build)
+          prerelease: true
+          files: dist/*
+          body: |
+            自动构建 / Automatic build from `${{ github.sha }}`.
+            产物 / Artifacts: musl 与 glibc 静态二进制（x86_64, aarch64）。
+            musl and glibc static binaries (x86_64, aarch64).

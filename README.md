@@ -131,8 +131,8 @@ The repo ships a workflow `.github/workflows/build.yml`; after forking, anyone c
   Push to `master`/`main`, a pull request, or a manual `Run workflow` from the Actions page.
 - 产物 / Artifacts：每个架构（`x86_64`、`aarch64`）产出 `apt-<arch>-musl` 与 `apt-<arch>-glibc`。
   For each architecture (`x86_64`, `aarch64`) it produces `apt-<arch>-musl` and `apt-<arch>-glibc`.
-- 发布 / Release：推送形如 `v1.0.0` 的 tag 会自动创建 Release 并附上全部二进制。
-  Pushing a tag like `v1.0.0` automatically creates a Release with all binaries attached.
+- 发布 / Release：工作流末尾会把产物发布到 Releases。推送到主分支滚动更新一个 `latest` 预发布（始终附最新二进制）；推送形如 `v1.0.0` 的 tag 则创建正式 Release。
+  At the end of the workflow the binaries are published to Releases. Pushing to the main branch updates a rolling `latest` pre-release (always carrying the newest binaries); pushing a tag like `v1.0.0` creates a proper Release.
 - 校验 / Verify：工作流会 `file` + `ldd` 确认是静态链接并打印 `--version`。
   The workflow runs `file` + `ldd` to confirm static linking and prints `--version`.
 
